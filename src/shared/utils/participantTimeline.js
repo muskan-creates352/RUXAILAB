@@ -2,30 +2,37 @@
 // Pure and metadata-only: it reads event types, controlled references and
 // counts, never answers.
 
+const parseFirestoreTimestamp = (value) => {
+  if (typeof value?.toMillis === 'function') {
+    return value.toMillis()
+  }
+  if (typeof value?.toDate === 'function') {
+    const d = value.toDate()
+    return d instanceof Date ? d.getTime() : null
+  }
+  const seconds = value?.seconds ?? value?._seconds
+  if (typeof seconds === 'number') {
+    const nanos = value?.nanoseconds ?? value?._nanoseconds ?? 0
+    return seconds * 1000 + Math.floor(nanos / 1e6)
+  }
+  return null
+}
+
 export const toMillis = (value) => {
   if (value === null || value === undefined) return null
 
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null
   }
-  if (typeof value?.toMillis === 'function') {
-    const ms = value.toMillis()
-    return typeof ms === 'number' && Number.isFinite(ms) ? ms : null
-  }
-  if (typeof value?.toDate === 'function') {
-    const d = value.toDate()
-    return d instanceof Date && !Number.isNaN(d.getTime()) ? d.getTime() : null
-  }
 
-  const seconds = value?.seconds ?? value?._seconds
-  if (typeof seconds === 'number') {
-    const nanos = value?.nanoseconds ?? value?._nanoseconds ?? 0
-    const ms = seconds * 1000 + Math.floor(nanos / 1e6)
-    return Number.isFinite(ms) ? ms : null
+  const fsMs = parseFirestoreTimestamp(value)
+  if (fsMs !== null) {
+    return Number.isFinite(fsMs) ? fsMs : null
   }
 
   if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value.getTime()
+    const time = value.getTime()
+    return Number.isNaN(time) ? null : time
   }
 
   const parsed = Date.parse(value)
